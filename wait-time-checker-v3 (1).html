@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Clinic Wait Time</title>
+<style>
+  :root{
+    --ink:#16262e;
+    --ink-soft:#3d5460;
+    --paper:#f4f8f7;
+    --card:#ffffff;
+    --line:#dde6e4;
+    --teal:#276b62;
+    --teal-deep:#1b4d46;
+    --amber:#7a5313;
+    --amber-bg:#fbf1e0;
+    --gray:#425055;
+    --gray-bg:#eceff0;
+    --green-bg:#e7f3ee;
+    --focus:#1a5cff;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;min-height:100%;
+    background:var(--paper);
+    color:var(--ink);
+    font-family: ui-rounded, "Segoe UI Rounded", "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  :focus-visible{
+    outline:3px solid var(--focus);
+    outline-offset:2px;
+  }
+  .skip-link{
+    position:absolute; left:-9999px; top:auto;
+    background:var(--ink); color:#fff; padding:10px 16px; border-radius:10px; z-index:100;
+  }
+  .skip-link:focus{ left:16px; top:16px; }
+
+  .wrap{
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:90px 20px 70px;
+  }
+  .topbar{
+    position:fixed;
+    top:0;left:0;right:0;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 16px;
+    background:linear-gradient(var(--paper), rgba(244,248,247,0));
+  }
+  .clinic-name{
+    font-size:14px;
+    font-weight:700;
+    letter-spacing:0.02em;
+    color:var(--ink-soft);
+  }
+  .lang-toggle{
+    display:flex;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:3px;
+    gap:2px;
+  }
+  .lang-btn{
+    border:none;
+    background:transparent;
+    padding:8px 15px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:700;
+    color:var(--ink-soft);
+    cursor:pointer;
+    min-height:38px;
+  }
+  .lang-btn[aria-pressed="true"]{
+    background:var(--teal);
+    color:#fff;
+  }
+
+  .card{
+    width:100%;
+    max-width:420px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:28px;
+    padding:40px 28px 32px;
+    text-align:center;
+    box-shadow:0 1px 2px rgba(20,40,35,0.04), 0 12px 32px rgba(20,40,35,0.06);
+  }
+
+  .status-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-size:14px;
+    font-weight:700;
+    padding:7px 14px;
+    border-radius:999px;
+    margin-bottom:22px;
+  }
+  .dot{ width:8px;height:8px;border-radius:50%; flex:none; }
+  .pill-open{ background:var(--green-bg); color:var(--teal-deep); }
+  .pill-open .dot{ background:var(--teal); }
+  .pill-closed{ background:var(--gray-bg); color:var(--gray); }
+  .pill-closed .dot{ background:var(--gray); }
+  .pill-stale{ background:var(--amber-bg); color:var(--amber); }
+  .pill-stale .dot{ background:var(--amber); }
+
+  @media (prefers-reduced-motion: no-preference){
+    .pill-open .dot{ animation:pulse 2.4s ease-in-out infinite; }
+  }
+  @keyframes pulse{
+    0%,100%{ box-shadow:0 0 0 0 rgba(39,107,98,0.35); }
+    50%{ box-shadow:0 0 0 6px rgba(39,107,98,0); }
+  }
+
+  .big-number{
+    font-size:96px;
+    line-height:1;
+    font-weight:800;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:-0.02em;
+    color:var(--teal-deep);
+    margin:0 0 4px;
+  }
+  .unit{ font-size:20px; font-weight:700; color:var(--ink-soft); margin-bottom:14px; }
+  .headline{ font-size:30px; font-weight:800; color:var(--ink); margin:6px 0 10px; line-height:1.15; }
+  .sub{ font-size:16px; color:var(--ink-soft); line-height:1.5; margin:0 auto 4px; max-width:320px; }
+  .phone-link{
+    display:inline-block;
+    margin-top:16px;
+    font-size:19px;
+    font-weight:800;
+    color:var(--teal-deep);
+    text-decoration:none;
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:11px 22px;
+    min-height:44px;
+  }
+  .phone-link:hover, .phone-link:focus-visible{ background:var(--green-bg); }
+  .freshness{ margin-top:20px; font-size:13px; color:var(--ink-soft); }
+
+  .staff-link{
+    position:fixed;
+    bottom:16px;
+    right:16px;
+    font-size:12px;
+    font-weight:700;
+    color:var(--ink-soft);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:10px 16px;
+    cursor:pointer;
+    min-height:40px;
+  }
+
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(15,25,22,0.45);
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+    z-index:20;
+  }
+  .overlay.show{ display:flex; }
+  .sheet{
+    width:100%;
+    max-width:460px;
+    background:#fff;
+    border-radius:24px 24px 0 0;
+    padding:22px 22px 28px;
+    box-shadow:0 -10px 40px rgba(0,0,0,0.2);
+  }
+  .sheet h2{ margin:0 0 4px; font-size:18px; color:var(--ink); }
+  .sheet .tag{
+    display:inline-block; font-size:11px; font-weight:800; letter-spacing:0.04em;
+    text-transform:uppercase; color:#fff; background:var(--teal);
+    padding:3px 9px; border-radius:6px; margin-bottom:10px;
+  }
+  .field{ margin:16px 0; text-align:left; }
+  .field label{ display:block; font-size:13px; font-weight:700; color:var(--ink-soft); margin-bottom:6px; }
+  .field input[type=number]{
+    width:100%; font-size:20px; padding:10px 12px;
+    border:1px solid var(--line); border-radius:12px; font-variant-numeric:tabular-nums;
+  }
+  .field .hint{ font-size:12px; color:var(--ink-soft); margin-top:6px; }
+  .field .error{ font-size:12px; color:#b3261e; margin-top:6px; font-weight:700; display:none; }
+  .field.has-error input{ border-color:#b3261e; }
+  .field.has-error .error{ display:block; }
+
+  .switch-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 0; border-top:1px solid var(--line);
+  }
+  .switch-row label{ font-size:14px; font-weight:700; color:var(--ink); }
+  .switch{
+    position:relative; width:46px; height:27px;
+    background:var(--gray-bg); border-radius:999px; cursor:pointer; border:none;
+    transition:background .15s;
+  }
+  .switch[aria-checked="true"]{ background:var(--teal); }
+  .switch::after{
+    content:""; position:absolute; top:3px; left:3px;
+    width:21px; height:21px; border-radius:50%;
+    background:#fff; transition:left .15s;
+    box-shadow:0 1px 3px rgba(0,0,0,0.3);
+  }
+  .switch[aria-checked="true"]::after{ left:22px; }
+
+  .stale-btn, .save-btn, .close-sheet{
+    width:100%; padding:14px; border-radius:14px; font-size:15px; font-weight:700;
+    border:none; cursor:pointer; margin-top:8px; min-height:48px;
+  }
+  .save-btn{ background:var(--teal); color:#fff; }
+  .stale-btn{ background:var(--amber-bg); color:var(--amber); }
+  .close-sheet{ background:transparent; color:var(--ink-soft); }
+  .confirm{
+    font-size:13px; color:var(--teal-deep); font-weight:700;
+    text-align:center; min-height:18px; margin-top:8px;
+  }
+  .visually-hidden{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+</style>
+</head>
+<body>
+
+<a href="#main" class="skip-link">Skip to wait time</a>
+
+<header class="topbar">
+  <div class="clinic-name">Riverside Community Health Clinic</div>
+  <div class="lang-toggle" role="group" aria-label="Language">
+    <button class="lang-btn" id="langEn" aria-pressed="true" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" id="langEs" aria-pressed="false" onclick="setLang('es')">ES</button>
+  </div>
+</header>
+
+<main class="wrap" id="main">
+  <div class="card" id="card" role="status" aria-live="polite"></div>
+</main>
+
+<button class="staff-link" id="staffLinkLabel" onclick="openStaff()" aria-haspopup="dialog">Front desk panel</button>
+
+<div class="overlay" id="overlay">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="staffTitle" id="sheet">
+    <span class="tag" id="staffTag">Staff only</span>
+    <h2 id="staffTitle">Update wait time</h2>
+
+    <div class="switch-row">
+      <label id="openLabel" for="openSwitch">Clinic is open</label>
+      <button class="switch" id="openSwitch" role="switch" aria-checked="true" aria-labelledby="openLabel" onclick="toggleOpen()"></button>
+    </div>
+
+    <div class="field" id="waitField">
+      <label id="waitLabelText" for="waitInput">Current wait (minutes)</label>
+      <input type="number" id="waitInput" min="0" max="240" value="25" aria-describedby="waitHint waitError">
+      <div class="hint" id="waitHint">Whole minutes, 0 to 240.</div>
+      <div class="error" id="waitError" role="alert">Enter a number between 0 and 240.</div>
+    </div>
+
+    <button class="stale-btn" id="staleBtn" onclick="simulateStale()">Simulate: no update in 45 min</button>
+    <button class="save-btn" id="saveBtn" onclick="saveStatus()">Save</button>
+    <div class="confirm" id="confirm" role="status" aria-live="polite"></div>
+    <button class="close-sheet" id="closeBtn" onclick="closeStaff()">Close</button>
+  </div>
+</div>
+
+<script>
+  let status = { wait_minutes: 25, clinic_open: true, last_updated: Date.now() };
+  let lang = 'en';
+  const STALE_MS = 30 * 60 * 1000;
+  const CLINIC_PHONE = "+15551234567";
+  const CLINIC_PHONE_DISPLAY = "(555) 123-4567";
+  let lastFocused = null;
+
+  const T = {
+    en: {
+      clinicName:"Riverside Community Health Clinic", staffLink:"Front desk panel", unit:"minutes",
+      normalHeadline:"Estimated wait", zeroHeadline:"No wait", zeroSub:"Come on in.",
+      closedHeadline:"Clinic is currently closed", closedSub:"Please check back during clinic hours.",
+      staleHeadline:"Wait time not updated recently", staleSub:"Call the front desk below, or come in \u2014 we'll see you as soon as we can.",
+      pillOpen:"Open now", pillClosed:"Closed", pillStale:"Update overdue",
+      freshnessPrefix:"Updated ", freshnessSuffix:" ago", justNow:"just now",
+      staffTag:"Staff only", staffTitle:"Update wait time", openLabel:"Clinic is open",
+      waitLabel:"Current wait (minutes)", waitHint:"Whole minutes, 0 to 240.",
+      waitError:"Enter a number between 0 and 240.",
+      staleBtn:"Simulate: no update in 45 min", saveBtn:"Save", closeBtn:"Close",
+      confirmMsg:"Saved. Patient view now shows this update."
+    },
+    es: {
+      clinicName:"Clínica Comunitaria Riverside", staffLink:"Panel de recepción", unit:"minutos",
+      normalHeadline:"Tiempo de espera estimado", zeroHeadline:"Sin espera", zeroSub:"Puede pasar.",
+      closedHeadline:"La clínica está cerrada", closedSub:"Vuelva a consultar durante el horario de atención.",
+      staleHeadline:"Tiempo de espera no actualizado", staleSub:"Llame a recepción, o venga directamente \u2014 la atenderemos lo antes posible.",
+      pillOpen:"Abierto", pillClosed:"Cerrado", pillStale:"Actualización pendiente",
+      freshnessPrefix:"Actualizado hace ", freshnessSuffix:"", justNow:"un momento",
+      staffTag:"Solo personal", staffTitle:"Actualizar tiempo de espera", openLabel:"La clínica está abierta",
+      waitLabel:"Espera actual (minutos)", waitHint:"Minutos enteros, de 0 a 240.",
+      waitError:"Ingrese un número entre 0 y 240.",
+      staleBtn:"Simular: sin actualizar hace 45 min", saveBtn:"Guardar", closeBtn:"Cerrar",
+      confirmMsg:"Guardado. La vista del paciente ya muestra este cambio."
+    }
+  };
+
+  function fmtAge(ms){
+    const mins = Math.floor(ms/60000);
+    if (mins < 1) return T[lang].justNow;
+    return T[lang].freshnessPrefix + mins + " min" + T[lang].freshnessSuffix;
+  }
+
+  function render(){
+    const t = T[lang];
+    document.documentElement.lang = lang;
+    document.querySelector('.clinic-name').textContent = t.clinicName;
+    document.getElementById('staffLinkLabel').textContent = t.staffLink;
+
+    const age = Date.now() - status.last_updated;
+    const isStale = age > STALE_MS || status.wait_minutes === null || status.wait_minutes === undefined;
+    const card = document.getElementById('card');
+    let html = "";
+
+    if (!status.clinic_open){
+      html += `<div class="status-pill pill-closed"><span class="dot"></span>${t.pillClosed}</div>`;
+      html += `<div class="headline">${t.closedHeadline}</div>`;
+      html += `<div class="sub">${t.closedSub}</div>`;
+    } else if (isStale){
+      html += `<div class="status-pill pill-stale"><span class="dot"></span>${t.pillStale}</div>`;
+      html += `<div class="headline">${t.staleHeadline}</div>`;
+      html += `<div class="sub">${t.staleSub}</div>`;
+      html += `<a class="phone-link" href="tel:${CLINIC_PHONE}" aria-label="${lang === 'es' ? 'Llamar a recepción,' : 'Call the front desk,'} ${CLINIC_PHONE_DISPLAY}">${CLINIC_PHONE_DISPLAY}</a>`;
+    } else if (status.wait_minutes === 0){
+      html += `<div class="status-pill pill-open"><span class="dot"></span>${t.pillOpen}</div>`;
+      html += `<div class="headline">${t.zeroHeadline}</div>`;
+      html += `<div class="sub">${t.zeroSub}</div>`;
+    } else {
+      html += `<div class="status-pill pill-open"><span class="dot"></span>${t.pillOpen}</div>`;
+      html += `<div class="big-number">${status.wait_minutes}</div>`;
+      html += `<div class="unit">${t.unit}</div>`;
+      html += `<div class="headline" style="font-size:20px;">${t.normalHeadline}</div>`;
+    }
+    if (status.clinic_open){
+      html += `<div class="freshness">${fmtAge(age)}</div>`;
+    }
+    card.innerHTML = html;
+
+    document.getElementById('staffTag').textContent = t.staffTag;
+    document.getElementById('staffTitle').textContent = t.staffTitle;
+    document.getElementById('openLabel').textContent = t.openLabel;
+    document.getElementById('waitLabelText').textContent = t.waitLabel;
+    document.getElementById('waitHint').textContent = t.waitHint;
+    document.getElementById('waitError').textContent = t.waitError;
+    document.getElementById('staleBtn').textContent = t.staleBtn;
+    document.getElementById('saveBtn').textContent = t.saveBtn;
+    document.getElementById('closeBtn').textContent = t.closeBtn;
+  }
+
+  function setLang(l){
+    lang = l;
+    document.getElementById('langEn').setAttribute('aria-pressed', String(l === 'en'));
+    document.getElementById('langEs').setAttribute('aria-pressed', String(l === 'es'));
+    render();
+  }
+
+  function getFocusable(container){
+    return Array.from(container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+      .filter(el => !el.disabled && el.offsetParent !== null);
+  }
+
+  function openStaff(){
+    lastFocused = document.activeElement;
+    document.getElementById('overlay').classList.add('show');
+    document.getElementById('waitInput').value = status.wait_minutes ?? '';
+    document.getElementById('confirm').textContent = '';
+    document.getElementById('waitField').classList.remove('has-error');
+    const sheet = document.getElementById('sheet');
+    const focusables = getFocusable(sheet);
+    if (focusables.length) focusables[0].focus();
+    document.addEventListener('keydown', trapFocus, true);
+  }
+
+  function closeStaff(){
+    document.getElementById('overlay').classList.remove('show');
+    document.removeEventListener('keydown', trapFocus, true);
+    if (lastFocused) lastFocused.focus();
+  }
+
+  function trapFocus(e){
+    const sheet = document.getElementById('sheet');
+    if (e.key === 'Escape'){ closeStaff(); return; }
+    if (e.key !== 'Tab') return;
+    const focusables = getFocusable(sheet);
+    if (!focusables.length) return;
+    const first = focusables[0], last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+  }
+
+  function toggleOpen(){
+    const el = document.getElementById('openSwitch');
+    const next = el.getAttribute('aria-checked') !== 'true';
+    el.setAttribute('aria-checked', String(next));
+  }
+
+  function simulateStale(){
+    status.last_updated = Date.now() - (45*60*1000);
+    document.getElementById('confirm').textContent = T[lang].confirmMsg;
+    render();
+  }
+
+  function saveStatus(){
+    const input = document.getElementById('waitInput');
+    const field = document.getElementById('waitField');
+    const raw = input.value.trim();
+    const val = raw === '' ? null : parseInt(raw, 10);
+    const invalid = raw !== '' && (isNaN(val) || val < 0 || val > 240);
+
+    if (invalid){
+      field.classList.add('has-error');
+      input.focus();
+      return;
+    }
+    field.classList.remove('has-error');
+    status.wait_minutes = val;
+    status.clinic_open = document.getElementById('openSwitch').getAttribute('aria-checked') === 'true';
+    status.last_updated = Date.now();
+    document.getElementById('confirm').textContent = T[lang].confirmMsg;
+    render();
+  }
+
+  render();
+  setInterval(render, 15000);
+</script>
+
+</body>
+</html>

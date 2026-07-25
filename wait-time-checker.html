@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Clinic Wait Time</title>
+<style>
+  :root{
+    --ink:#16262e;
+    --ink-soft:#4c6470;
+    --paper:#f4f8f7;
+    --card:#ffffff;
+    --line:#dde6e4;
+    --teal:#276b62;
+    --teal-deep:#1b4d46;
+    --amber:#9c6b1a;
+    --amber-bg:#fbf1e0;
+    --gray:#5c6b70;
+    --gray-bg:#eceff0;
+    --green-bg:#e7f3ee;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    background:var(--paper);
+    color:var(--ink);
+    font-family: ui-rounded, "Segoe UI Rounded", "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    min-height:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .topbar{
+    position:fixed;
+    top:0;left:0;right:0;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 16px;
+  }
+  .clinic-name{
+    font-size:14px;
+    font-weight:700;
+    letter-spacing:0.02em;
+    color:var(--ink-soft);
+  }
+  .lang-toggle{
+    display:flex;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:3px;
+    gap:2px;
+  }
+  .lang-btn{
+    border:none;
+    background:transparent;
+    padding:7px 14px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:700;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .lang-btn.active{
+    background:var(--teal);
+    color:#fff;
+  }
+
+  .card{
+    width:100%;
+    max-width:420px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:28px;
+    padding:40px 28px 32px;
+    text-align:center;
+    box-shadow:0 1px 2px rgba(20,40,35,0.04), 0 12px 32px rgba(20,40,35,0.06);
+  }
+
+  .status-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+    font-weight:700;
+    padding:7px 14px;
+    border-radius:999px;
+    margin-bottom:22px;
+  }
+  .dot{
+    width:8px;height:8px;border-radius:50%;
+    flex:none;
+  }
+  .pill-open{ background:var(--green-bg); color:var(--teal-deep); }
+  .pill-open .dot{ background:var(--teal); animation:pulse 2.4s ease-in-out infinite; }
+  .pill-closed{ background:var(--gray-bg); color:var(--gray); }
+  .pill-closed .dot{ background:var(--gray); }
+  .pill-stale{ background:var(--amber-bg); color:var(--amber); }
+  .pill-stale .dot{ background:var(--amber); }
+
+  @keyframes pulse{
+    0%,100%{ box-shadow:0 0 0 0 rgba(39,107,98,0.35); }
+    50%{ box-shadow:0 0 0 6px rgba(39,107,98,0); }
+  }
+
+  .big-number{
+    font-size:96px;
+    line-height:1;
+    font-weight:800;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:-0.02em;
+    color:var(--teal-deep);
+    margin:0 0 4px;
+  }
+  .unit{
+    font-size:20px;
+    font-weight:700;
+    color:var(--ink-soft);
+    margin-bottom:14px;
+  }
+  .headline{
+    font-size:30px;
+    font-weight:800;
+    color:var(--ink);
+    margin:6px 0 10px;
+    line-height:1.15;
+  }
+  .sub{
+    font-size:16px;
+    color:var(--ink-soft);
+    line-height:1.5;
+    margin:0 auto 4px;
+    max-width:320px;
+  }
+  .freshness{
+    margin-top:20px;
+    font-size:13px;
+    color:var(--ink-soft);
+    opacity:0.85;
+  }
+
+  .staff-link{
+    position:fixed;
+    bottom:16px;
+    right:16px;
+    font-size:12px;
+    color:var(--ink-soft);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:8px 14px;
+    cursor:pointer;
+    opacity:0.75;
+  }
+  .staff-link:hover{ opacity:1; }
+
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(15,25,22,0.45);
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+    z-index:20;
+  }
+  .overlay.show{ display:flex; }
+  .sheet{
+    width:100%;
+    max-width:460px;
+    background:#fff;
+    border-radius:24px 24px 0 0;
+    padding:22px 22px 28px;
+    box-shadow:0 -10px 40px rgba(0,0,0,0.2);
+  }
+  .sheet h3{
+    margin:0 0 4px;
+    font-size:18px;
+    color:var(--ink);
+  }
+  .sheet .tag{
+    display:inline-block;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:#fff;
+    background:var(--teal);
+    padding:3px 9px;
+    border-radius:6px;
+    margin-bottom:10px;
+  }
+  .field{ margin:16px 0; text-align:left; }
+  .field label{
+    display:block;
+    font-size:13px;
+    font-weight:700;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .field input[type=number]{
+    width:100%;
+    font-size:20px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    font-variant-numeric:tabular-nums;
+  }
+  .row{ display:flex; gap:10px; }
+  .row .field{ flex:1; }
+  .switch-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 0;
+    border-top:1px solid var(--line);
+  }
+  .switch{
+    position:relative; width:44px; height:26px;
+    background:var(--gray-bg); border-radius:999px; cursor:pointer;
+    transition:background .15s;
+  }
+  .switch.on{ background:var(--teal); }
+  .switch::after{
+    content:""; position:absolute; top:3px; left:3px;
+    width:20px; height:20px; border-radius:50%;
+    background:#fff; transition:left .15s;
+    box-shadow:0 1px 3px rgba(0,0,0,0.3);
+  }
+  .switch.on::after{ left:21px; }
+  .stale-btn, .save-btn, .close-sheet{
+    width:100%;
+    padding:13px;
+    border-radius:14px;
+    font-size:15px;
+    font-weight:700;
+    border:none;
+    cursor:pointer;
+    margin-top:8px;
+  }
+  .save-btn{ background:var(--teal); color:#fff; }
+  .stale-btn{ background:var(--amber-bg); color:var(--amber); }
+  .close-sheet{ background:transparent; color:var(--ink-soft); }
+  .confirm{
+    font-size:13px; color:var(--teal-deep); font-weight:700;
+    text-align:center; height:18px; margin-top:8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="clinic-name" id="clinicName">Riverside Community Health Clinic</div>
+  <div class="lang-toggle">
+    <button class="lang-btn active" id="langEn" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" id="langEs" onclick="setLang('es')">ES</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="card" id="card"></div>
+</div>
+
+<div class="staff-link" onclick="openStaff()" id="staffLinkLabel">Staff update</div>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <span class="tag" id="staffTag">Staff only</span>
+    <h3 id="staffTitle">Update wait time</h3>
+    <div class="switch-row">
+      <span id="openLabel">Clinic is open</span>
+      <div class="switch on" id="openSwitch" onclick="toggleOpen()"></div>
+    </div>
+    <div class="field">
+      <label id="waitLabel">Current wait (minutes)</label>
+      <input type="number" id="waitInput" min="0" max="240" value="25">
+    </div>
+    <button class="stale-btn" id="staleBtn" onclick="simulateStale()">Simulate: no update in 45 min</button>
+    <button class="save-btn" id="saveBtn" onclick="saveStatus()">Save</button>
+    <div class="confirm" id="confirm"></div>
+    <button class="close-sheet" id="closeBtn" onclick="closeStaff()">Close</button>
+  </div>
+</div>
+
+<script>
+  // ---- In-memory status record (no patient data of any kind) ----
+  let status = {
+    wait_minutes: 25,
+    clinic_open: true,
+    last_updated: Date.now()
+  };
+  let lang = 'en';
+  const STALE_MS = 30 * 60 * 1000;
+
+  const T = {
+    en: {
+      clinicName: "Riverside Community Health Clinic",
+      staffLink: "Staff update",
+      unit: "minutes",
+      normalHeadline: "Estimated wait",
+      zeroHeadline: "No wait",
+      zeroSub: "Come on in.",
+      closedHeadline: "Clinic is currently closed",
+      closedSub: "Please check back during clinic hours.",
+      staleHeadline: "Wait time not available right now",
+      staleSub: "Please call the front desk for the latest update.",
+      pillOpen: "Open now",
+      pillClosed: "Closed",
+      pillStale: "Update overdue",
+      freshnessPrefix: "Updated ",
+      freshnessSuffix: " ago",
+      justNow: "just now",
+      staffTag: "Staff only",
+      staffTitle: "Update wait time",
+      openLabel: "Clinic is open",
+      waitLabel: "Current wait (minutes)",
+      staleBtn: "Simulate: no update in 45 min",
+      saveBtn: "Save",
+      closeBtn: "Close",
+      confirmMsg: "Saved. Patient view updated."
+    },
+    es: {
+      clinicName: "Clínica Comunitaria Riverside",
+      staffLink: "Actualizar (personal)",
+      unit: "minutos",
+      normalHeadline: "Tiempo de espera estimado",
+      zeroHeadline: "Sin espera",
+      zeroSub: "Puede pasar.",
+      closedHeadline: "La clínica está cerrada",
+      closedSub: "Vuelva a consultar durante el horario de atención.",
+      staleHeadline: "Tiempo de espera no disponible",
+      staleSub: "Llame a recepción para la información más reciente.",
+      pillOpen: "Abierto",
+      pillClosed: "Cerrado",
+      pillStale: "Actualización pendiente",
+      freshnessPrefix: "Actualizado hace ",
+      freshnessSuffix: "",
+      justNow: "un momento",
+      staffTag: "Solo personal",
+      staffTitle: "Actualizar tiempo de espera",
+      openLabel: "La clínica está abierta",
+      waitLabel: "Espera actual (minutos)",
+      staleBtn: "Simular: sin actualizar hace 45 min",
+      saveBtn: "Guardar",
+      closeBtn: "Cerrar",
+      confirmMsg: "Guardado. Vista del paciente actualizada."
+    }
+  };
+
+  function fmtAge(ms){
+    const mins = Math.floor(ms/60000);
+    if (mins < 1) return T[lang].justNow;
+    return T[lang].freshnessPrefix + mins + " min" + T[lang].freshnessSuffix;
+  }
+
+  function render(){
+    const t = T[lang];
+    document.getElementById('clinicName').textContent = t.clinicName;
+    document.getElementById('staffLinkLabel').textContent = t.staffLink;
+    document.title = "Clinic Wait Time";
+
+    const age = Date.now() - status.last_updated;
+    const isStale = age > STALE_MS || status.wait_minutes === null || status.wait_minutes === undefined;
+    const card = document.getElementById('card');
+    let html = "";
+
+    if (!status.clinic_open){
+      html += `<div class="status-pill pill-closed"><span class="dot"></span>${t.pillClosed}</div>`;
+      html += `<div class="headline">${t.closedHeadline}</div>`;
+      html += `<div class="sub">${t.closedSub}</div>`;
+    } else if (isStale){
+      html += `<div class="status-pill pill-stale"><span class="dot"></span>${t.pillStale}</div>`;
+      html += `<div class="headline">${t.staleHeadline}</div>`;
+      html += `<div class="sub">${t.staleSub}</div>`;
+    } else if (status.wait_minutes === 0){
+      html += `<div class="status-pill pill-open"><span class="dot"></span>${t.pillOpen}</div>`;
+      html += `<div class="headline">${t.zeroHeadline}</div>`;
+      html += `<div class="sub">${t.zeroSub}</div>`;
+    } else {
+      html += `<div class="status-pill pill-open"><span class="dot"></span>${t.pillOpen}</div>`;
+      html += `<div class="big-number">${status.wait_minutes}</div>`;
+      html += `<div class="unit">${t.unit}</div>`;
+      html += `<div class="headline" style="font-size:20px;">${t.normalHeadline}</div>`;
+    }
+
+    if (status.clinic_open){
+      html += `<div class="freshness">${fmtAge(age)}</div>`;
+    }
+
+    card.innerHTML = html;
+
+    // Staff sheet labels
+    document.getElementById('staffTag').textContent = t.staffTag;
+    document.getElementById('staffTitle').textContent = t.staffTitle;
+    document.getElementById('openLabel').textContent = t.openLabel;
+    document.getElementById('waitLabel').textContent = t.waitLabel;
+    document.getElementById('staleBtn').textContent = t.staleBtn;
+    document.getElementById('saveBtn').textContent = t.saveBtn;
+    document.getElementById('closeBtn').textContent = t.closeBtn;
+  }
+
+  function setLang(l){
+    lang = l;
+    document.getElementById('langEn').classList.toggle('active', l === 'en');
+    document.getElementById('langEs').classList.toggle('active', l === 'es');
+    render();
+  }
+
+  function openStaff(){
+    document.getElementById('overlay').classList.add('show');
+    document.getElementById('waitInput').value = status.wait_minutes ?? '';
+    document.getElementById('confirm').textContent = '';
+  }
+  function closeStaff(){
+    document.getElementById('overlay').classList.remove('show');
+  }
+  function toggleOpen(){
+    document.getElementById('openSwitch').classList.toggle('on');
+  }
+  function simulateStale(){
+    status.last_updated = Date.now() - (45*60*1000);
+    document.getElementById('confirm').textContent = T[lang].confirmMsg;
+    render();
+  }
+  function saveStatus(){
+    const val = document.getElementById('waitInput').value;
+    status.wait_minutes = val === '' ? null : Math.max(0, parseInt(val, 10));
+    status.clinic_open = document.getElementById('openSwitch').classList.contains('on');
+    status.last_updated = Date.now();
+    document.getElementById('confirm').textContent = T[lang].confirmMsg;
+    render();
+  }
+
+  render();
+  // Refresh the "updated X min ago" label periodically, same as a real client would poll.
+  setInterval(render, 15000);
+</script>
+
+</body>
+</html>
